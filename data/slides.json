@@ -1,0 +1,164 @@
+[
+  {
+    "slide": 1,
+    "title": "稀疏自编码器的实验设计与证据",
+    "seconds": 40,
+    "script": "今天汇报 Anthropic 的《Towards Monosemanticity》，作者是 Bricken 等人，我是陈俊伟。我们只讨论实验部分：研究者怎样从模型内部激活中提取可解释特征，以及怎样检查这些解释。核心方法是稀疏自编码器，也就是用少量非零系数重构原始激活的神经网络。本次先看四个个案，再看随机抽样的整体评估，最后看字典规模与损失恢复。每个实验都按目的、设置、读图和结论展开，区分相关证据与实际干预，也明确每个数字能支持到什么程度。",
+    "detail": "**目的**：说明研究问题与本次范围。SAE 是 sparse autoencoder，即稀疏自编码器；“单义”指同一个单元的激活能由相对一致的语义或计算属性解释。\n\n**设置**：研究对象为已经训练完成的一层 Transformer。SAE 训练在事后进行，不改变被研究模型的语言建模训练目标。\n\n**图表与结论**：封面不承担实验读数。主线是个案验证、全局评估和系统性现象。标题的“单义”应理解为相对改善，不能预设每个特征都只有唯一含义。\n\n论文署名为 Trenton Bricken 等，机构为 Anthropic，发表于 2023 年。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-analysis\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#global-analysis",
+    "print_locator": "网页章节"
+  },
+  {
+    "slide": 2,
+    "title": "一次前向传播中的激活分解",
+    "seconds": 60,
+    "script": "先明确我们观察的位置。输入文本经过嵌入与注意力后，MLP 产生一个五百一十二维激活向量。SAE 的编码器读取这个向量，给出四千零九十六个非负特征强度，解码器再把它们组合成原激活的近似。编码器决定何时激活，解码器决定激活后沿哪个方向影响模型。叠加假说认为，模型可以在较少神经元中表示更多特征。实验要检验这种分解是否可解释、是否影响输出，以及它是否优于逐个查看神经元。接下来先固定模型规模和符号。",
+    "detail": "**目的**：定位实验操作的模块，避免把 SAE 当作原 Transformer 自带的一层。\n\n**设置**：单个 token 对应的 MLP 激活记作 a∈R^512，SAE 稀疏码记作 f∈R^4096。编码后重构为 â=b_d+D f。D∈R^(512×4096)，每列 d_i∈R^512 是一个单位写入方向。\n\n**读图**：前向传播主线是 token、embedding、attention、MLP、输出残差、归一化、词表预测。SAE 是连接在 MLP 激活位置的分析支路。只观察时不必将重构送回模型；损失恢复实验才替换原激活；特征干预实验则直接改写原激活。\n\n**结论**：本次重点为实验，不展开完整叠加理论或 SAE 优化推导。单义性/多义性是激活解释的一致程度，叠加是表示在共享空间中的组织方式，两者相关但不能等同。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#problem-setup-decomposition\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#setup-autoencoder\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-analysis",
+    "print_locator": "网页章节"
+  },
+  {
+    "slide": 3,
+    "title": "模型、数据与字典运行",
+    "seconds": 80,
+    "script": "被研究模型只有一层 Transformer，残差流一百二十八维，MLP 有五百一十二个 ReLU 神经元，使用 The Pile 的一千亿个 token 训练。SAE 另用约八十亿个 MLP 激活向量训练，因此语言模型训练量与 SAE 样本量是两回事。A、B 表示两个随机种子下的模型，斜杠后的编号表示字典学习运行。主要分析 A/1，它有四千零九十六个特征；A/0 到 A/5 在固定稀疏惩罚下扩大字典，最大为十三万一千零七十二。下面用统一符号说明一个特征到底是什么。",
+    "detail": "**目的**：给出所有实验的共同基础，区分训练数据、分析数据与字典宽度。\n\n**设置与数值**：语言模型在 The Pile 上训练 100B token，残差维度 128，MLP 隐藏维度 512，激活函数 ReLU。SAE batch size 为 8192，更新 1,000,000 步，使用略多于 8B 个激活向量；激活数据池总计 10B，不应写“40M 上下文×250=8B”，该乘积是 10B。\n\n**字典编号**：A/0…A/5 是固定 L1 系数、逐步增加宽度的序列。已核实的定位是 A/0=512、A/1=4096、A/2=16384、A/5=131072。全文共有 90 个字典学习运行，不是 90 个语言模型。重点字典 A/1 是原 MLP 宽度的 8 倍。\n\n**死单元重采样**：这里的“死神经元”指 SAE 中长时间不激活的单元。原实验只在第 25k、50k、75k、100k 步检查过去 12.5k 步未点火者，用重构较差的样本重新初始化对应编码与解码方向；不能表述为训练全程每隔 25k 步执行。\n\n**结论**：过完备字典是方向数多于原空间维度，不表示原模型新增了同样数量的独立神经元。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#setup-transformer\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#setup-notation\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-transformer\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-autoencoder-dataset\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-autoencoder-resampling",
+    "print_locator": "设置表与附录训练章节"
+  },
+  {
+    "slide": 4,
+    "title": "特征强度、写入方向与代理分数",
+    "seconds": 110,
+    "script": "一个特征包含两个不同对象。特征强度会随 token 变化，超过零就称为点火；解码方向在训练后固定，它与强度相乘才是该特征的向量贡献。编码器的一行负责检测，解码器的一列负责写入，两者并不要求相同。代理分数是研究者另外写出的程序，用对数似然比衡量文本符合某个假设的证据，不是模型给出的真值。随机样本中，特征零激活比例的跨单元均值为百分之八十八，神经元为百分之五十四；这不能直接当作每个稀疏码的零元素比例。",
+    "detail": "**目的**：固定符号，区分“检测”“强度”“写入方向”与外部标签。\n\n**符号与维度**：\n- a∈R^512：MLP 的 ReLU 激活，随文本与位置改变。\n- W_enc∈R^(4096×512)：SAE 编码矩阵；第 i 行是检测方向。\n- b_d∈R^512、b_e∈R^4096：解码偏置与编码偏置。\n- f=ReLU[W_enc(a−b_d)+b_e]∈R^4096；f_i 是非负标量。\n- D∈R^(512×4096)：SAE 解码矩阵；第 i 列 d_i 为单位写入方向。\n- â=b_d+Σ_i f_i d_i∈R^512。f_i 是当前强度，d_i 是固定方向；f_i 并不是概率或已经校准的语义置信度。\n- e_j∈R^512：第 j 个标准基向量，只有第 j 个坐标为 1。它不是另一个训练出的实体矩阵。\n- W_out∈R^(128×512)：MLP 输出投影。W_U∈R^(V×128)：将残差状态映射到 V 个词表 logits 的反嵌入矩阵。\n- A/1/3450：来自模型 A、字典运行 1、编号 3450 的特征。最后的数字是索引，不编码语义；“阿拉伯文字特征”来自观察后的解释。\n\n**代理分数生成**：用 z 表示一个字符串，避免和分数符号混淆。s_H(z)=log[P(z|H)/P(z)]；H 是“这段字符串来自指定字符/文字语境”的假设。分母以数据集的 token unigram 频率乘积估算，包含近似独立假设。\n- 字符集合类：随机 base64 对集合内字符给 1/64，集合外给极小概率；DNA 对 A/T/C/G 各给 1/4。对 DNA 至少看两个 token，避免 CAT 等普通词孤立触发代理。\n- 文字系统类：用 Unicode 区块判断完整字符串属于阿拉伯文字/希伯来文字的情况，结合贝叶斯公式估计分子。空格和标点可能被判为非目标，因此代理有假阴性。\n- 字节碎片：单个 token 不构成完整 Unicode 字符时，抽取它在语料中的真实出现位置，以属于目标文字系统的经验比例估计。\n- 前文窗口：对以当前 token 结束、长度不同的前文片段计算分数并取最大值，允许连续上下文累计证据。原文称 prefixes leading up to the final token；含义是不同长度的前文，不是随意改变当前 token 的字节前缀。遇到代理与特征冲突时查看真实文本和分词，不把代理自动当作人工真值。\n\n**稀疏率口径**：88%/54% 是自动解释评估的随机样本中，真实激活恰为零的比例再跨单元取均值；中位约为 91%/58%。不能据此断言每个 4096 维 f 都恰有 88% 的坐标为零。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#problem-setup-decomposition\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#setup-notation\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-proxies\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-automated-importance-scoring",
+    "print_locator": "代理附录；自动解释附录（附件打印定位 p.86 附近）"
+  },
+  {
+    "slide": 5,
+    "title": "四个个案特征与五项检验",
+    "seconds": 60,
+    "script": "论文选择四个容易建立计算代理的语境：阿拉伯文字、DNA、base64 和希伯来文字。阿拉伯文字包含使用同一文字系统的多种语言，不能仅叫阿拉伯语；base64 则是编码文本，不是自然语言。四个特征分别检查在哪里激活、目标语境是否被覆盖、怎样影响输出、是否只是某个神经元，以及另一个模型中能否重现。作者明确承认这些个案经过挑选，所以它们用于展示证据如何成立，不能代表全部特征。下面以阿拉伯文字为主线，先看激活与语境的对应关系。",
+    "detail": "**目的**：说明个案选择的依据与推论范围。\n\n**对象**：阿拉伯文字 A/1/3450；DNA A/1/2937；base64 A/1/2357；希伯来文字 A/1/416。\n\n**设置**：四个假设都可以用字符集合或 Unicode 区块构造代理。DNA 个案偏向长的大写 A/T/C/G 序列；base64 代理可能同时覆盖某些十六进制字符串，因而比目标特征更宽。\n\n**五项检验**：①特异性是“点火时通常是什么语境”；②敏感性是“目标语境出现时是否点火”；③下游效应检验输出作用；④非神经元检验排除简单复现原坐标；⑤普遍性检验另一模型中是否有相似特征。\n\n**结论**：这些是经过挑选的详细个案，原文使用 cherry-picked 一词。有效个案能展示方法可行，是否普遍更好还需要第 12–14 页的全局抽样。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-analysis\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-arabic\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-dna\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-base64\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-hebrew",
+    "print_locator": "附件打印定位 p.18 与四个个案章节"
+  },
+  {
+    "slide": 6,
+    "title": "激活分布中的特异性与敏感性",
+    "seconds": 130,
+    "script": "这张图的横轴是特征激活，纵轴是密度，颜色表示外部代理提供的阿拉伯文字证据。先看零到一附近，较弱激活混入较多非目标文本；再看超过五的区间，目标比例达到百分之九十八。全部训练 token 中阿拉伯文字仅占百分之零点一三，而点火位置中占百分之八十一。峰高不能直接当作比例，底部色条才展示给定激活下的条件分布。左侧细条另画恰为零的质量。四千万个 token 上，激活与阈值化代理的相关为零点七四，它同时涉及敏感性与特异性。",
+    "detail": "**目的**：检验特征是否在假设语境中激活，并考察遗漏与弱激活的来源。\n\n**设置**：对每个 token 计算 f_3450 与阿拉伯文字代理分数，按激活分箱，再按代理分数组成着色直方图。红色代表较强的阿拉伯文字证据，蓝色代表较弱证据或非目标。原图横轴向右延伸到约 9，不应把高激活范围固定说成 5–6.5。\n\n**读图顺序**：\n1. 看 x=0 的独立竖条：它代表离散的零激活概率质量，可以记作 P(f_i=0)δ_0。它与正激活密度不是同一种量，不要按视觉高度直接相加。\n2. 看低激活区：有较多蓝色，代理判断目标语境的比例在“刚点火”处约 25%。这不意味着低区只有 25% 的杂质，恰好相反，目标比例才是约 25%。\n3. 看高激活区：f_i>5 时，代理判断的目标比例约 98%；高激活与阿拉伯文字明显对应。\n4. 看底部条件分布色条：每个横坐标内部归一化，回答 P(代理语境|激活区间)，不能用来比较各区间有多少 token。\n5. 回到整体点火样本：约 81% 判为阿拉伯文字，约 19% 为补集。这是对所有 f_i>0 样本的语义分组，不能机械等同成两个彼此分离的峰各占 81%/19%。直方图比例来自面积或计数积分，不来自峰高。\n\n**敏感性补充**：40M token 上，f_i 与“代理分数大于 0”的二值变量 Pearson r=0.74。它是同时涉及敏感性、特异性与激活幅值的联合指标，既不是召回率 74%，也不是纯度 74%。\n\n**代理误差与特征分工**：空格、标点和字节碎片可造成代理假阴性；较弱激活也可能来自小模型误判或 SAE 未完全分解。A/1/3134 在若干定冠词位置激活，A/1/3399 常处理分裂 Unicode 字符的首 token，而 3450 常在末 token 激活。按激活幅值加权的期望值图说明主要激活总量仍来自目标语境，不能把全部弱激活直接宣判为无关。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-arabic-activations\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-arabic-sensitivity",
+    "print_locator": "附件打印定位 p.19–21"
+  },
+  {
+    "slide": 7,
+    "title": "logit 权重给出的输出倾向",
+    "seconds": 130,
+    "script": "前一页看输入侧，这一页问特征激活后会怎样影响输出。logit 是 softmax 之前每个词表 token 的分数。固定特征方向后，将它依次经过 MLP 输出投影、近似归一化和反嵌入，就得到一组词表权重，再减去中位数画出分布。绘图阶段不需要新的输入文本，但这依赖 LayerNorm 的线性近似。先看零附近的大峰，再看右侧离群的阿拉伯文字及字节 token。它们获得较高相对权重，说明写入方向与解释一致；是否实际改变预测，还需下一页的干预。",
+    "detail": "**目的**：交叉验证“什么时候激活”的解释是否与“激活后支持什么输出”一致。SAE 训练只见 MLP 激活，未使用后续输出权重，因此这是额外证据。\n\n**logit 的定义**：z∈R^V，P(v)=exp(z_v)/Σ_u exp(z_u)。任意两 token 满足 z_u−z_v=log[P(u)/P(v)]。给所有 logits 加同一个常数不会改变概率，因此一个特征的 logit 权重可以减去其中位数，绝对零点不具有独立含义。\n\n**矩阵形状与五步生成**：\n1. 取固定 d_i∈R^512。\n2. W_out d_i∈R^128，将方向写入输出残差流。\n3. 经过近似 LayerNorm，再反嵌入到词表。采用列向量记法，w_i≈W_U L π W_out d_i∈R^V；π=I−11ᵀ/128∈R^(128×128) 去均值，L∈R^(128×128) 是近似缩放的对角矩阵。原文行向量公式为 d_i W_down π L W_unembed。\n4. 用 w_i−median(w_i) 对齐零点。\n5. 对词表权重画密度直方图并按代理着色，排除极罕见或未使用的词表项。\n\n**近似边界**：简式 W_U W_out d_i 必须标注“忽略 LayerNorm”。真实归一化缩放依赖当前残差状态，因此 a 到真实 logits 不是全局精确线性映射。固定近似矩阵后绘制权重图不需新的输入文本，并不表示近似矩阵的估计从未利用数据。\n\n**读图**：零附近的大峰含大量非目标词。右尾较小的模式聚集阿拉伯文字相关 token，常见首字节包括 \\xd8、\\xd9。底部颜色条把权重位置与 token 属性对应起来。中央峰可能来自叠加干扰，这是作者解释，不是已独立证明的噪声定理。右尾 0.45–0.6 一带可作为局部放大阅读区域，不当作普适阈值。\n\n**神经元同样有效应表**：w_j^neuron≈W_U L π W_out e_j∈R^V；等价于取 W_out 第 j 列再映射到词表。特征和神经元公式对称，区别来自方向及其解释一致性，不是只有 SAE 才能计算输出权重。\n\n**结论**：高相对权重表示对相关 token 的相对支持。它不等同具体输入上的概率变化，且不能保证所有中位数以上 token 的概率都增加；softmax 仍会联合归一化。因此需要实际前向干预。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-arabic-effect",
+    "print_locator": "附件打印定位 p.22"
+  },
+  {
+    "slide": 8,
+    "title": "删除与钉住特征的干预",
+    "seconds": 130,
+    "script": "实际干预以同一文本、未改动模型的输出为基准。消融是在原始 MLP 激活中减去该特征的强度乘方向，再继续前向传播。蓝紫下划线表示删除后预测变差，红橙下划线表示变好。注意背景标记激活位置，下划线标记随后被预测的位置，两者可能相邻错开。原图比较两个激活档，较强档的删除影响更大。另一项实验从数字前缀开始，把特征钉到最大观测激活，模型便生成阿拉伯文字。这两种干预支持因果贡献，但不足以证明它独自负责所有相关行为。",
+    "detail": "**目的**：检查权重分析描述的方向是否在真实模型计算中发挥作用。\n\n**设置与基准**：对相同上下文先记录未干预模型的 log P_orig(token)。然后在整个上下文的每个位置用 SAE 得到 f_i(a)，改写该位置的原始 MLP 激活。这里不是把整个 MLP 替换成 SAE 重构；未分解的重构残差仍保留。\n\n**删除**：a′=a−f_i(a)d_i，维度仍为 R^512。计算 Δlog P=log P_ablated−log P_orig。\n- Δlog P<0：删除降低后续 token 概率，图中蓝/紫下划线，说明原特征曾帮助该预测。\n- Δlog P>0：删除提高概率，红/橙下划线，说明原特征相对抑制该 token。\n- 橙色背景表示当前 token 的特征激活。若在 [B] 位置干预影响 [C] 的预测，背景在 [B]、下划线在 [C]。\n\n**读图**：先定位激活背景，再定位随后 token 的下划线。阿拉伯文字预测普遍受损，而共享标点可受益，这是原特征平时相对压低这些标点的结果。原图展示 subsample interval 0 与 5 两档，前者中心 token 的激活约为后者两倍；可以说“高激活档影响更大”，不能称为已估计完整连续剂量—反应曲线。\n\n**钉住采样**：目标强度记 m，为该特征最大观测值；a′=a+[m−f_i(a)]d_i。数字前缀为 1,2,3,4,5,6,7,8,9,10。生成时持续施加钉住，输出转为阿拉伯文字。结论是文字系统方向的行为改变，不能额外保证输出为语法或语义正确的阿拉伯语。\n\n**结论与限制**：删除支持“该特征对这些预测有贡献”，注入支持“提高该方向能促进相应输出”。可以用必要性/充分性的操作思路理解，但不能据此证明它在全部上下文中严格必要、单独充分或唯一。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-arabic-effect\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-feature-ablations",
+    "print_locator": "附件打印定位 p.23"
+  },
+  {
+    "slide": 9,
+    "title": "下游效应的三步证据",
+    "seconds": 60,
+    "script": "现在把三步证据放在一起。第一步计算输出权重，检查这个方向是否支持与解释一致的词表 token。第二步在真实上下文删除它，看相应预测是否受损。第三步提高它的强度，看生成是否出现相应变化。第一步依赖线性近似，后两步直接运行干预后的模型，因此它们能补充彼此的限制。三者共同支持特征与模型功能有关，而不只是文本中存在某种统计相关。接下来还要排除另一种解释：SAE 是否只是把一个原本就很清楚的神经元重新命名了。",
+    "detail": "**目的**：汇总主张③的证据结构。\n\n**设置**：“算”使用固定解码方向 d_i 和模型后续权重；“删”和“注”在 R^512 的原始 MLP 激活位置操作，然后继续完整前向传播。\n\n**图示读法**：三步按证据依赖关系排列，不应把权重计算本身当作已经完成因果证明。实际效果受当前文本、其它特征、残差与 LayerNorm 影响。\n\n**结论**：一致的输入解释、输出权重和干预结果，加强了对特征功能解释的信心。它仍不是一份完整的机制分解，也不证明各个特征彼此独立。SAE 解码方向通常不正交，沿 d_i 改写激活后重新编码，其他 f_k 也可能变化。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-arabic-effect\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#global-analysis-about-model",
+    "print_locator": "附件打印定位 p.22–23"
+  },
+  {
+    "slide": 10,
+    "title": "特征与单个神经元的区别",
+    "seconds": 110,
+    "script": "如果这个特征只是某个神经元，那么它的解码方向应接近那个坐标轴，两者在真实文本上的激活也应高度同步。论文分三层检查。方向系数并非只有一个非零值，二十七个神经元的系数绝对值至少为零点一，最大的三个绝对系数都为负。约四千万个 token 上，最相关的神经元是四百八十九号，但阿拉伯文字特征与它的激活相关只有零点零九。输出散点中，特征轴能较好分开阿拉伯文字 token，神经元轴做不到。这说明该个案的分解具有非平凡的新增解释价值。",
+    "detail": "**目的**：排除“SAE 只挑选了一个已经单义的神经元”这一替代解释。\n\n**权重级设置**：在固定神经元坐标系中检查 d_i∈R^512。若它只是第 j 个原神经元的正缩放版本，归一化后应接近 e_j，即 one-hot 方向。阿拉伯文字个案有 27 个坐标满足 |d_ij|≥0.1，最大绝对值的前三个系数均为负。不能把这改写成“数百个显著系数”。\n\n**激活级设置**：在约 40M token 上计算 corr(f_i,a_j)，遍历 512 个神经元。最相关者为 A/neurons/489，原散点图给 Pearson r=0.09。这个神经元响应多种非英语文字，阿拉伯文字仅占一小部分。其他个案中 base64 对最相似神经元约为 0.18，希伯来文字约为 0.10，因此不要把“0.1–0.18”当作包含阿拉伯个案的精确范围。\n\n**输出级读图（打印 p.25）**：激活散点的每个点是一个 token 出现位置；logit 散点的每个点则是一个词表 token。横轴是神经元值，纵轴是特征值。沿纵轴，目标 token 更能与非目标分开；沿横轴则明显混合。阿拉伯个案的 logit 权重相关为 0.21，这和激活相关 0.09 是不同的比较。\n\n**结论**：至少这些详细个案不是单一神经元的平凡重命名。并不要求所有 SAE 特征都偏离坐标轴；有少量神经元对齐特征也不推翻叠加假说。不能说只要一个特征对齐神经元，“叠加假说就崩塌”。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-arabic-neuron\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-base64-neuron\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-hebrew-neuron",
+    "print_locator": "附件打印定位 p.24–25"
+  },
+  {
+    "slide": 11,
+    "title": "跨随机种子的特征重现",
+    "seconds": 100,
+    "script": "普遍性实验训练另一个模型 B，保持架构、数据与超参数，改变随机种子。随后在 B 的字典中，按同一批 token 上的激活相关寻找最相似特征。四个个案分别得到零点九一、零点九二、零点八五和零点九二。左侧激活散点看目标语境是否沿对角线共同变化；右侧输出散点看高权重的目标 token 是否共同成为离群点。右图整体相关只有零点二三，不能因此忽略右上方共同结构。这里的零点九一比较两个模型的特征，上一页零点零九比较特征与神经元，对象不同。",
+    "detail": "**目的**：检验个案是否只是模型 A 的偶然坐标组织，或只存在于某次 SAE 学习。\n\n**设置**：两个 Transformer 的数据、架构与超参数相同而随机种子不同；对应 SAE 也分别训练。配对准则是 40,960,000 token 上的最高 Pearson 激活相关，不是直接对齐跨模型神经元索引，也不是余弦相似度。\n\n**四组配对**：\n- Arabic：A/1/3450 ↔ B/1/1334，r=0.91。\n- DNA：A/1/2937 ↔ B/1/3680，r=0.92。\n- Base64：A/1/2357 ↔ B/1/2165，r=0.85。\n- Hebrew：A/1/416 ↔ B/1/1901，r=0.92。\n\n**双面板读法（打印 p.28）**：左图每点为真实 token 位置，在 A/B 特征激活坐标中观察红色目标语境沿对角线形成共同变化结构；其总体 Pearson 相关为 0.91。右图每点是词表 token，观察目标 token 是否在两个模型里都被赋予较高输出权重；共享右上离群结构支持相同输出倾向。中央大量小权重近乎不相关，使整体 logit 相关降为 0.23。作者将中央结构解释为可能的权重干扰，而不声称两张权重表完全相同。\n\n**结论**：四个个案可重现，但检验范围是这两个同配置小模型，不直接证明跨所有架构、数据和规模都一致。0.91、0.09、0.21、0.23 各有不同对象，口播时必须随数字说清比较项。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-arabic-universality\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-dna-universality\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-base64-universality\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-hebrew-universality\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#phenomenology-universality",
+    "print_locator": "附件打印定位 p.27–28"
+  },
+  {
+    "slide": 12,
+    "title": "人工评分中的整体可解释性",
+    "seconds": 110,
+    "script": "为避免只展示挑选个案，论文对抽样特征和神经元进行人工评分。先排除死特征及超低密度特征，再覆盖不同激活强度，而不只看最大样例。这里人工评估明确使用十一个区间；十三个区间属于后面的自动解释流程，不能混用。最终四百一十二次区间评分覆盖一百六十二个单元。评分看解释信心、激活一致性、输出权重一致性和特异性，满分十四分。神经元中位为零，特征区间中位为十二。这支持整体差异，但只有一名作者标注，评分标准也含主观判断。",
+    "detail": "**目的**：检验随机抽样的典型特征是否仍比神经元可解释，缓解挑选个案的局限。\n\n**抽样范围**：A/1 共 4096 个特征，其中 168 个在 100M 分析样本中完全不激活，292 个为超低密度组（小于百万分之一并有其它异常性质），这两组排除后再做全局可解释性分析。因此结论针对保留的特征，不能声称覆盖所有 4096 个。\n\n**区间与盲评**：人工评估把 0 到最大激活之间分成 11 个等距 activation intervals，均匀抽取区间并结合该单元整体解释评分。每档展示真实文本，重点激活 token 以加粗等方式标示。全文共 412 个区间评分、162 个特征或神经元；没有给每个单元全部区间评分。标注者 Adam Jermyn 是论文作者之一，实验对单元身份作盲化；不能因此称独立第三方或多标注者评审。\n\n**Rubric 六步骤**：\n1. 根据跨区间激活与正向 logit 建立解释，此步不计分。\n2. 解释信心 0–3。\n3. 高激活 token 与解释一致性 0–5。\n4. 正向 logit 与解释一致性 0–3。\n5. 若有不一致 logit，一致和不一致项能否按效应大小分离，计 0/1；若第 4 项满分，该项不适用、为 0。\n6. 解释特异性 0–3。\n\n因此最高 14 而非 15：第 4 项得 3 时第 5 项不能再加 1；第 4 项少一分时才可能获得分离性 1 分。\n\n**图表与结论**：评分直方图比较神经元与特征区间的分布，中位分别 0 与 12。0 表示标注者甚至不能形成可靠统一解释；不等于单元没有模型功能。保留小样本、单标注者与主观 rubric 三项限制。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#global-analysis-interp\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#global-analysis-interp-manual\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-rubric",
+    "print_locator": "附件打印定位 p.44 与评分附录"
+  },
+  {
+    "slide": 13,
+    "title": "自动解释：预测未见文本的激活",
+    "seconds": 95,
+    "script": "自动解释把评估扩展到更多单元。第一阶段，Claude 阅读真实激活样例和输出权重，生成一段解释。第二阶段在新的交互中只使用解释，预测未见文本中各 token 的激活，再与真实值比较。测试覆盖十三个激活档及随机、脱离上下文的样例，总计通常六十段、五百四十个 token，用 Spearman 相关评分。特征比神经元更容易预测。重要性加权试图还原自然样本比例，却容易让大量零激活主导分数，因此一个总分不能代替对正激活行为的检查。下一页再从输出侧交叉验证。",
+    "detail": "**目的**：把“可解释”转化为可以预测新激活的可测任务，并减少单个人工评审的工作量。\n\n**两阶段设置**：\n- 解释阶段通常给 49 例：最高激活区间 10 例、其余 12 区间各 2 例、完全随机 5 例、最高激活 token 出现在其它上下文 10 例；另给 top/bottom logits 和区间标识。\n- 测试阶段通常给 60 例：最高档 6 例、其余 12 档各 2 例、随机 10 例、脱离原语境的高激活 token 20 例。每例 9 token，所以通常得到 540 个预测。\n- 激活量化为 0–9，测试时移除真实激活、logits 与区间标签；使用新交互并打乱样例，解释样例与测试样例不重合。去重可能使少量单元的样例数略少。\n\n**指标读法**：原文图中 Spearman 分数中位数为特征 0.58、神经元 0.20。Spearman 相关测量预测与真实激活的排序一致程度。若预测全部为同一常数，相关本来无定义，论文将分数置 0。高分说明解释在该测试设计中能预测激活，不证明解释完整或唯一。\n\n**重要性加权**：研究者用区间出现概率和特征密度给过采样的激活样例降权，试图反映自然语料比例。但极稀疏特征中，权重主要落在几乎全为零的随机样例；少量假阳性会被强烈惩罚，过于保守的“几乎都不激活”解释可能受益，正激活结构反而难以检验。\n\n**88%/54%**：这些数字来自上述随机样例真实激活为零的比例，再跨单元求均值；中位约 91%/58%。它们用于说明加权评估的困难，不是 SAE 码的固定 L0 比例。\n\n**结论**：激活预测评估支持特征优于神经元，但分数依赖抽样与权重。随机模型的单 token 特征还会造成下一页要讨论的反常高分。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#global-analysis-interp-auto-acts\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-automated-setup\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-automated-importance-scoring",
+    "print_locator": "附件打印定位 p.85–86；自动解释附录"
+  },
+  {
+    "slide": 14,
+    "title": "输出预测测试与权重打乱对照",
+    "seconds": 115,
+    "script": "输出版测试沿用已有解释，判断某个词表 token 是否是特征应支持的后续输出。考题由五十个高正权重 token 与五十个随机 token 构成，解释阶段见过的前十大权重项排除在测试外。正文报告特征平均百分之七十四，神经元百分之五十八，随机猜测基线百分之五十。附录的零点七四、零点五三和零点五零是中位数，最后一项来自权重打乱模型。打乱模型在激活预测中可能得分更高，主要由更容易解释的单 token 特征推动；这也说明必须把激活解释与输出解释一起检查。",
+    "detail": "**目的**：检验激活解释能否预测未见输出权重，并用随机结构对照区分语料统计与模型学习。\n\n**考题构造**：使用第 13 页生成的同一解释。Claude 对 100 个词表 token 给出二分类判断：50 个随机 token，50 个来自高正权重区、原文称第 10–60 大正 logits。最前面的 10 个用于解释阶段，测试予以留出。它问的是“给定解释，这个 token 是否合理地成为随后预测”，并非判断一个任意实数权重是否大于零，也不是整个自然词表中正负权重的均匀抽样。\n\n**读图与统计口径**：\n- 主文平均准确率：A/1 特征 74%，神经元 58%。两组均按该平衡测试设计统计。\n- 50% 是二分类随机猜测基线，不是神经网络的语言建模准确率。\n- 附录中位准确率：A/1 特征 0.74，神经元 0.53，权重打乱模型特征 0.50。这里的 0.50 是实测中位数，和理论猜测基线是两个不同对象。\n- 原文内部差异：正文 logit 准确率分布图标注特征 median=0.73、mean=0.74，而附录文字写 median=0.74。本稿保留两处读数并说明来源，主讲使用无歧义的均值 74%/58% 与随机猜测基线 50%。不能将图中的 0.73 静默改成 0.74。\n- 留出前 10 大项避免直接复用解释阶段展示的最明显词表项；它降低直接泄漏，但不证明对任意新分布都泛化。\n\n**随机模型如何生成**：将已训练模型 A 每个权重矩阵中的条目随机打乱，保持各矩阵元素边际分布而破坏其结构，然后在该模型激活上训练 SAE。它不是未经训练的另一个随机初始化模型。\n\n**反常激活高分的拆解**：若最高激活档的 20 个样例中，最大激活位置始终为同一个 token，论文将其标作 single-token。打乱模型有更多、更纯粹的此类特征，它们不太依赖上下文，因此激活预测容易。对非 single-token 组，真实 A/1 特征表现更好，而打乱特征更接近原神经元；打乱模型的输出权重预测则约为随机水平。\n\n**结论**：真实模型的优势在复杂、上下文相关且与输出一致的结构。74% 是这项具体自动解释测试的平均准确率，不能表述成“74% 的模型行为已经被解释”。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#global-analysis-interp-auto-logits\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#global-analysis-about-model\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-automated-setup\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-automated-randomized",
+    "print_locator": "附件打印定位 p.88；主文自动 logit 评估"
+  },
+  {
+    "slide": 15,
+    "title": "字典规模、特征结构与损失恢复",
+    "seconds": 100,
+    "script": "扩大字典后，论文观察到较宽泛特征分成更细的特征。例如 base64 在五百一十二特征字典中主要由一个特征覆盖，在四千零九十六特征字典中分成三个，分别表现出字母、数字及编码 ASCII 文本等差异。跨模型全字典匹配的激活相关中位为零点七二，神经元对照为零点四六。模型生成的 token 还可能触发后续特征，形成类似有限状态自动机的结构。最后，用 SAE 重构替换激活，A/1 恢复该层损失贡献的百分之七十九，A/5 为百分之九十四点五；作者明确要求谨慎解释。",
+    "detail": "**目的**：考察个案之外的系统性结构，以及分解是否保留模型功能。\n\n**字典扫描与特征分裂**：在 512、4096、16384 等不同宽度下比较相近方向与激活范围。A/0/45 的 base64 行为在 A/1 中由 A/1/2357（偏字母）、A/1/2364（偏数字）、A/1/1544（偏编码 ASCII 文本）共同覆盖。它们输出倾向也有区别；例如当前 token 是单个数字时，下一个数字可能已被分词器合并，因此数字特征会相对压低继续数字的预测。分裂说明可解释组织依赖字典分辨率，并不等同同一个已确定的“真实特征”被唯一拆成子特征。\n\n**全字典普遍性**：对 A/1 的每个保留特征，在 B/1 中找激活相关最高的匹配者，中位激活 Pearson 相关为 0.72；神经元按同样思路匹配，中位 0.46。这是激活相关，不是两个解码向量的余弦相似度，也不是百分之七十二特征完全相同。\n\n**FSA**：有限状态自动机是有限状态及状态间转移的系统。论文观察到，某特征支持生成特定 token，这些 token 在后续位置又触发自身或其它特征。例如 base64 自循环、大写词与下划线之间的转移。这里通过生成 token 实现时序耦合，不能描述成同一层 SAE 特征直接互相连线计算。\n\n**损失恢复三状态**：L_orig 为原模型损失；L_zero 为把 MLP 激活置零后的损失；L_sae 为用 â 替代 a 后的损失。恢复比例 R=(L_zero−L_sae)/(L_zero−L_orig)。A/1=79%；A/5（131072 特征，L1 系数 0.004）=94.5%。这是相对于零消融基线、该 MLP 层损失贡献的恢复比例，不是语义解释覆盖率。\n\n**谨慎解释**：原文明确用 grain of salt 警示：零消融可能是特别差的基线，使比例看起来偏高；低激活区仍可能多义，部分特征未必清楚可解释，长尾行为覆盖也不能由一个损失比率概括。重构忠实性与解释质量是不同要求。\n\n**图表读法**：分裂图追踪父特征与子特征的激活范围；附录恢复图横轴 Average L0 norm 是每个 token 平均非零特征数，纵轴是 MLP 损失恢复比例，颜色表示不同 L1 系数，线内再改变字典宽度。它直接呈现稀疏性与恢复率的折中，横轴不能误标为字典规模。第 14 页的 held-out logit 测试是另一个独立验证，不应把其准确率与本页恢复比例相乘得到“已解释行为比例”。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#phenomenology-feature-splitting\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#phenomenology-universality\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#phenomenology-fsa\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#global-analysis-how-much\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-hyperparameters",
+    "print_locator": "附件打印定位 p.52–64；损失恢复主文与附录"
+  },
+  {
+    "slide": 16,
+    "title": "结论与适用边界",
+    "seconds": 60,
+    "script": "这组实验支持四个结论：SAE 能提取激活相对一致的特征；这些特征的写入方向和实际干预具有可解释的输出作用；典型特征的解释性优于神经元；部分特征能够跨随机种子重现，并形成更细的结构。边界同样明确：四个个案经过挑选，人工评估只有一名作者参与，评分与代理都有误差，logit 权重采用归一化近似。损失恢复也不等于语义理解比例。这些结果来自单层小模型，不能直接推广到所有大模型。最后两页提供术语索引和完整维度图，便于答疑。",
+    "detail": "**目的**：把实证结论与尚未证明的部分分开。\n\n**四项总结**：①输入侧可解释性；②输出功能与干预一致；③整体上优于原神经元；④跨随机种子与跨字典的稳定组织。个案中的非神经元检验为第③项补充替代解释排除，不能把它当作全模型已经完全解叠加。\n\n**必保留的限制**：\n- cherry-picked：四个详细个案用于展示存在性，需结合抽样全局评估。\n- 单一标注者：对单元身份盲化并不等同独立、多标注者一致性检验。\n- Rubric 与代理主观性/近似：文字系统代理漏掉共享标点与某些字节碎片；自动解释得分受抽样和单 token 行为影响。\n- LayerNorm 近似：输出权重图使用固定线性近似，真实干预才在模型的真实计算中验证。\n- grain of salt：79%/94.5% 具有零消融基线与长尾解释问题。\n- 模型范围：一层、128 维残差、512 个 MLP 神经元；不能据此声称大型多层模型可以以相同成本完整解释。\n\n**结论**：这是有交叉验证的特征发现与干预方法，尚未建立特征分解的唯一性、完整性或跨所有模型的普遍性。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-analysis\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#global-analysis-interp-caveats\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#global-analysis-how-much\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#discussion",
+    "print_locator": "附件打印定位 p.18、44、结论与相关实验章节"
+  },
+  {
+    "slide": 17,
+    "title": "附录：概念与首次出现位置",
+    "seconds": 40,
+    "script": "这一页把汇报中的术语集中列出，方便回查。请特别区分四组概念：神经元是原模型坐标，特征是学习到的方向及其强度；编码器负责检测，解码器负责写入；logit 是未归一化分数，概率还需要 softmax；激活相关、输出权重相关与损失恢复分别衡量不同对象。表中的首次出现页码对应本次 PPT。死单元重采样属于 SAE 训练步骤，钉住属于训练后的模型干预，两者作用位置和目的也不同。答疑时可以先定位定义，再回到相应实验图。",
+    "detail": "**概念清单与首次出现页码**：\n- 稀疏自编码器 SAE：以少量非零特征系数重构原激活的模型；第 1 页。\n- 单义性/多义性：单元的反应能否由相对一致的属性解释；第 1–2 页。\n- 字典学习：从数据学习一组可重构数据的方向及对应系数；第 2–3 页。\n- 叠加 superposition：在共享低维空间表示多于坐标数的特征；第 2 页。\n- 稀疏码：SAE 编码得到、通常只有少量非零项的 f；第 2 页。\n- 过完备：字典方向数超过原激活空间维度；第 3 页。\n- 死单元重采样：重新初始化长时间未激活的 SAE 单元；第 3 页。本文在 25k/50k/75k/100k 步执行，不是全程每 25k。\n- 点火：某特征强度 f_i>0；第 4 页。\n- 编码器行/解码器列：分别决定检测条件与写入方向；第 2、4 页。\n- 代理分数：基于假设生成分布与语料分布的近似对数似然比；第 4 页。\n- 特异性/敏感性：分别考察点火位置的语境纯度、目标语境的覆盖；第 5–6 页。\n- Logit/效应表：softmax 前的词表分数/单位特征强度造成的近似词表分数变化；第 7 页。\n- 消融：从原激活减去 f_i d_i 并观察输出变化；第 8 页。\n- 钉住采样：持续把特征强度设定到目标值后生成文本；第 8 页。\n- Rubric：明确分项与条件的人工评分准则；第 12 页。\n- Spearman 相关：衡量两个变量排序的一致性；第 13 页。\n- 单 token 特征：最高档样例中的最大激活始终落在同一 token 的特征；第 14 页。\n- 特征分裂：扩大字典后，原宽泛反应由更具体特征分担；第 15 页。\n- FSA：有限状态及转移的系统；本研究观察特征通过生成 token 实现类似转移；第 15 页。\n- 损失恢复：相对 MLP 零消融基线，SAE 重构恢复的损失改善比例；第 15 页。\n\n**使用方式**：PPT 概念表采用精简定义，完整符号和条件分别见本稿第 4、7、12、15 页。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#problem-setup-decomposition\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#setup-autoencoder\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-proxies\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-rubric\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#phenomenology-fsa",
+    "print_locator": "对应各术语原文章节"
+  },
+  {
+    "slide": 18,
+    "title": "附录：模型主线、SAE 支路与观测点",
+    "seconds": 50,
+    "script": "最后用完整架构确认所有矩阵的位置。嵌入把 token 变成一百二十八维残差状态；MLP 的上投影得到五百一十二维，再经 ReLU 形成我们分析的激活。SAE 把它编码到四千零九十六维，再解码回五百一十二维。原模型的下投影把激活写回残差流，经过归一化和反嵌入得到词表 logits。删除与钉住就在 MLP 激活处进行，非神经元检验比较同一位置的原坐标与 SAE 特征，输出效应则在词表端观察。注意 SAE 是分析支路，原模型日常预测并不必须经过它。",
+    "detail": "**矩阵方向约定**：本稿统一使用列向量，与原论文部分行向量公式是转置关系。V 是词表大小。\n\n**主线**：\n1. token 索引查询嵌入表 E∈R^(V×128)，得到 h∈R^128；若使用 one-hot 列 t∈R^V，则 h=Eᵀt。\n2. 单个注意力块输出/更新残差流 h∈R^128。完整模型含相应归一化与残差支路，不应把注意力当作一个任意矩阵代替。\n3. MLP 上投影 W_in∈R^(512×128)，加偏置并经 ReLU，a=ReLU(W_in h+b_in)∈R^512。图示可省略位置编码、偏置等非本次重点，但要标明为简化。\n4. MLP 下投影 W_out∈R^(128×512)，将 W_out a 加回残差流。\n5. 最终 LayerNorm 后，通过 W_U∈R^(V×128) 得到 z∈R^V，再由 softmax 得概率。\n\n**SAE 支路**：a∈R^512 → W_enc∈R^(4096×512) → f∈R^4096 → D∈R^(512×4096) → â∈R^512，含第 4 页的偏置与 ReLU。D 的列和 W_enc 的行不是绑定权重。\n\n**操作与观测点**：\n- 主张③删除/钉住：在 a 处用 a′=a−f_i d_i 或 a′=a+(m−f_i)d_i，然后运行真实模型后续计算。\n- 主张④权重级：查看 d_i 的 512 个坐标；激活级：比较 f_i 与每个 a_j；输出级：比较相应效应表。\n- 损失恢复：把 a 整体替换为 â，并比较原始、零消融、重构三种状态。\n\n**易错点**：嵌入表与反嵌入矩阵虽然都可写 V×128，但用途与方向不同；e_j 是标准基向量，不在架构中新增一层；从 a 到 logits 还经过依赖输入的归一化，不能画成无条件精确线性映射。",
+    "source": "https://transformer-circuits.pub/2023/monosemantic-features/index.html#setup-transformer\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#problem-setup-decomposition\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#feature-arabic-effect\nhttps://transformer-circuits.pub/2023/monosemantic-features/index.html#appendix-transformer",
+    "print_locator": "架构与矩阵定义章节"
+  }
+]

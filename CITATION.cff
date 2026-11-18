@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "使用本仓库的教学材料时，请引用本仓库，并同时引用原论文 Bricken et al. (2023)。论文原图不包含在本仓库原创内容的 MIT 许可中。"
+title: "Towards Monosemanticity：稀疏自编码器实验部分中文图文讲解"
+type: software
+authors:
+  - family-names: "陈"
+    given-names: "俊伟"
+version: 1.0.0
+date-released: 2026-11-18
+license: MIT
+repository-code: "https://github.com/TomHaoZi/monosemanticity-sae-guide"
+url: "https://github.com/TomHaoZi/monosemanticity-sae-guide"
+abstract: "18 页可编辑 PPT、逐页口播与详细解析、关键实验原图、概念解释及来源校准。学习资料，不包含语言模型或 SAE 的训练复现。"
+keywords:
+  - sparse-autoencoder
+  - mechanistic-interpretability
+  - monosemanticity
+  - dictionary-learning
+  - chinese
